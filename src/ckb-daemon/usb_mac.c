@@ -271,6 +271,67 @@ static void pipecomplete(void* refcon, IOReturn result, void* arg0){
     (*handle)->ReadPipeAsync(handle, ctx->pipe, buffer, ctx->maxsize, pipecomplete, ctx);
 }
 
+CFMachPortRef event_tap;
+
+CGEventRef cg_callback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void* refcon) {
+    if (type == kCGEventTapDisabledByTimeout) {
+        CGEventTapEnable(event_tap, true);
+        return event;
+    }
+
+    if (event) {
+        for(int i = 0; i < DEV_MAX; i++){
+            if(IS_CONNECTED(keyboard + i)){
+                usbdevice *kb = keyboard + i;
+                if (!IS_MOUSE_DEV(kb)) {
+                    pthread_mutex_lock(imutex(kb));
+                    CGEventSetFlags(event, (kCGEventFlagMaskNonCoalesced | kb->modifiers));
+                    pthread_mutex_unlock(imutex(kb));
+                    break;
+                }
+            }
+        }
+    }
+    return event;
+}
+
+void registerCGEventTap(CFRunLoopRef run_loop) {
+
+    CGEventMask mask = CGEventMaskBit(kCGEventLeftMouseDown) |
+    CGEventMaskBit(kCGEventLeftMouseUp) |
+    CGEventMaskBit(kCGEventRightMouseDown) |
+    CGEventMaskBit(kCGEventRightMouseUp) |
+    CGEventMaskBit(kCGEventMouseMoved) |
+    CGEventMaskBit(kCGEventLeftMouseDragged) |
+    CGEventMaskBit(kCGEventRightMouseDragged) |
+    CGEventMaskBit(kCGEventScrollWheel) |
+    CGEventMaskBit(kCGEventTabletPointer) |
+    CGEventMaskBit(kCGEventTabletProximity) |
+    CGEventMaskBit(kCGEventOtherMouseDown) |
+    CGEventMaskBit(kCGEventOtherMouseUp) |
+    CGEventMaskBit(kCGEventOtherMouseDragged);
+    
+
+    event_tap = CGEventTapCreate(kCGHIDEventTap,
+                                 kCGHeadInsertEventTap,
+                                 kCGEventTapOptionDefault,
+                                 mask,
+                                 cg_callback,
+                                 NULL);
+    if (event_tap) {
+        CFRunLoopSourceRef run_loop_source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, event_tap, 0);
+        if (run_loop_source) {
+            ckb_info("Registering EventTap for modifier keys.\n");
+            CFRunLoopAddSource(run_loop, run_loop_source, kCFRunLoopCommonModes);
+            CGEventTapEnable(event_tap, true);
+            
+            CFRelease(run_loop_source);
+        }
+    }
+    
+}
+
+
 // input_mac.c
 extern void keyretrigger(CFRunLoopTimerRef timer, void* info);
 
@@ -838,6 +899,8 @@ int usbmain(){
     if(iterator_hid)
         iterate_devices_hid(0, iterator_hid);
 
+    registerCGEventTap(mainloop);
+    
     // Enter loop to scan/connect new devices
     CFRunLoopRun();
     return 0;
