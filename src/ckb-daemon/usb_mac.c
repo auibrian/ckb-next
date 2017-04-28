@@ -327,7 +327,7 @@ void register_mouse_event_tap(CFRunLoopRef run_loop) {
 
     // Set mask to catch all mouse events, as the modifier keys
     // can change the look of the pointer.
-    
+
     CGEventMask mask = CGEventMaskBit(kCGEventLeftMouseDown) |
                         CGEventMaskBit(kCGEventLeftMouseUp) |
                         CGEventMaskBit(kCGEventRightMouseDown) |
@@ -350,7 +350,7 @@ void register_mouse_event_tap(CFRunLoopRef run_loop) {
                                  mask,
                                  mouse_event_modifier_callback,
                                  NULL);
-    
+
     // Add the tap to the runloop
     if (mouse_event_tap) {
         CFRunLoopSourceRef run_loop_source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, mouse_event_tap, 0);
@@ -932,7 +932,7 @@ int usbmain(){
         iterate_devices_hid(0, iterator_hid);
 
     register_mouse_event_tap(mainloop);
-    
+
     // Enter loop to scan/connect new devices
     CFRunLoopRun();
     return 0;
